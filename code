@@ -1,0 +1,124 @@
+#define BLYNK_TEMPLATE_ID "TMPL3hYwY049M"
+#define BLYNK_TEMPLATE_NAME "battery"
+#define BLYNK_AUTH_TOKEN "j5qb5wguUE2eOcap7aFx4p1TxKdPDlOv"
+
+#ifdef ESP32
+  #include <WiFi.h>
+  #include <BlynkSimpleEsp32.h>
+#else
+  #include <ESP8266WiFi.h>
+  #include <BlynkSimpleEsp8266.h>
+#endif
+
+#define BLYNK_PRINT Serial
+ 
+char auth[] = "j5qb5wguUE2eOcap7aFx4p1TxKdPDlOv";    // authuntifaction id
+char ssid[] = "project01";   //wifi name
+char pass[] = "project01";   //wifi password
+
+WidgetLED indicator(V0);
+
+#define ANALOG_IN_PIN A0
+float adc_voltage = 0.0;
+float in_voltage = 0.0;
+float R1 = 30000.0;
+float R2 = 7500.0; 
+float ref_voltage = 3.3;
+int adc_value = 0;
+
+#include "DHT.h"
+#define DHTPIN D5
+#define DHTTYPE DHT11  // DHT 22 , DHT 21
+DHT dht(DHTPIN, DHTTYPE);
+float h,t,f;
+
+int i=1;
+int j=1;
+
+void setup()
+{
+  Serial.begin(9600);
+  
+  pinMode(D0,OUTPUT);
+  digitalWrite(D0,LOW);
+  
+  pinMode(ANALOG_IN_PIN,INPUT);
+
+  WiFi.begin(ssid, pass);
+  Serial.print("Connecting to WiFi ..");
+  while(WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print('.');
+    delay(500);
+  }
+  
+  Blynk.config(auth);
+  Serial.println("READY");
+
+  dht.begin();
+}
+ 
+void loop()
+{
+  Blynk.run();
+  
+  volt_loop();
+  dht_data();
+
+  Blynk.virtualWrite(V3,h);
+  Blynk.virtualWrite(V2,t);
+  Blynk.virtualWrite(V1,in_voltage);
+  
+  digitalWrite(D0,LOW);indicator.on();delay(200);digitalWrite(D0,HIGH);indicator.off();delay(200);
+}
+void volt_loop()
+{
+  adc_value = analogRead(ANALOG_IN_PIN);
+  adc_voltage  = (adc_value * ref_voltage) / 1024.0;
+  in_voltage = adc_voltage*(R1+R2)/R2;
+  Serial.print("Input Voltage = ");
+  Serial.println(in_voltage, 2);
+  delay(100);
+
+  if(in_voltage <= 2)
+  {
+    if(i==1)
+    {
+      i=0;
+      Serial.println("ALERT SENT battery_alert");
+      Blynk.logEvent("battery_alert");
+    }
+  }
+  else
+  {
+    i=1;
+  }
+}
+
+void dht_data()
+{
+  h = dht.readHumidity();
+  t = dht.readTemperature();   // Read temperature as Celsius (the default)
+  f = dht.readTemperature(true);   // Read temperature as Fahrenheit (isFahrenheit = true)
+
+  Serial.print(F("Humidity: "));
+  Serial.print(h);
+  Serial.print(F("%  Temperature: "));
+  Serial.print(t);
+  Serial.print(F("°C "));
+  Serial.print(f);
+
+  if(t >= 30)
+  {
+    if(j==1)
+    {
+      j=0;
+      Serial.println("ALERT SENT temperature_alert");
+      Blynk.logEvent("temperature_alert");
+    }
+  }
+  else
+  {
+    j=1;
+  }
+}
